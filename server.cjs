@@ -4,6 +4,7 @@ const html=fs.readFileSync(__dirname+'/index.html');
 const key=process.env.GEMINI_API_KEY, enabled=process.env.GEMINI_FREE_TRIAL==='true'&&!!key;
 const owner=process.env.GEMINI_TEST_EMAIL?.trim().toLowerCase();
 const sb='https://jtfvkkwstdxyikpgjhln.supabase.co', anon='sb_publishable_p_aNk7_KqcMuMA0yFcwf8A_yXhrnd-T';
+const testers=new Set([owner,...(process.env.GEMINI_TEST_EMAILS||'').split(',').map(x=>x.trim().toLowerCase())].filter(Boolean));
 let day='',count=0,last=0,inflight=false;
 const reply=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data))};
 const limits={brand:80,category:80,size:30,color:60,material:100,notes:1000,title:120,description:1500};
@@ -15,7 +16,7 @@ if(req.headers.origin!=='https://fripgain-production.up.railway.app')return repl
 const token=req.headers.authorization;if(!token?.startsWith('Bearer '))return reply(res,401,{error:'Connecte-toi dans Profil.'});
 const auth=await fetch(sb+'/auth/v1/user',{headers:{apikey:anon,Authorization:token},signal:AbortSignal.timeout(8000)});
 if(!auth.ok)return reply(res,401,{error:'Session invalide.'});
-const u=await auth.json();if(!u.email_confirmed_at||u.email?.toLowerCase()!==owner)return reply(res,403,{error:'Scanner réservé au compte de test autorisé.'});
+const u=await auth.json();if(!u.email_confirmed_at||!testers.has(u.email?.toLowerCase()))return reply(res,403,{error:'Scanner réservé au compte de test autorisé.'});
 let chunks=[],n=0;for await(const chunk of req){n+=chunk.length;if(n>3000000){reply(res,413,{error:'Photos trop volumineuses.'});return}chunks.push(chunk)}
 let data;try{data=JSON.parse(Buffer.concat(chunks))}catch{return reply(res,400,{error:'Requête invalide.'})}
 if(!data||!validImage(data.photo)||(data.label&&!validImage(data.label)))return reply(res,400,{error:'Photo JPEG invalide.'});
